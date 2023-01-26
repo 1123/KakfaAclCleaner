@@ -1,3 +1,5 @@
+package io.confluent.examples.aclcleaner;
+
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.Admin;
@@ -9,30 +11,32 @@ import org.apache.kafka.common.resource.PatternType;
 import org.apache.kafka.common.resource.ResourcePatternFilter;
 import org.apache.kafka.common.resource.ResourceType;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
+// TODO: add a dryrun option
 
 @Slf4j
 public class AclCleanerService {
 
     private Admin adminClient;
 
-    public AclCleanerService() {
-        // TODO: Configurionat should be read from a properites file
+    public AclCleanerService(String propertiesFile) throws IOException {
         Properties properties = new Properties();
-        properties.put("sasl.mechanism", "SCRAM-SHA-256");
-        properties.put("security.protocol", "SASL_PLAINTEXT");
-        properties.put("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required " +
-                "  username=\"kafka\" " +
-                "  password=\"kafka-pass\";");
-        properties.put("bootstrap.servers", "localhost:9093");
+        File file = new File(propertiesFile);
+        InputStream stream = new FileInputStream(file);
+        properties.load(stream);
         adminClient = Admin.create(properties);
     }
 
     @SneakyThrows
-    public void clean() {
+    public void clean(boolean dryrun) {
         var topicList = adminClient.listTopics().listings().get();
         log.info(topicList.toString());
         var aclList = adminClient.describeAcls(
@@ -46,14 +50,21 @@ public class AclCleanerService {
         log.info(topicMap.toString());
         aclList.forEach(aclBinding -> {
             // TODO: what about ACLs for consumer groups?
+            // TODO: also think about ACLs for transactional producers
+            // TODO: what about ACLs on cluster level?
             if (aclBinding.pattern().resourceType() == ResourceType.TOPIC) {
                 if (aclBinding.pattern().name().equals("*")) {
+                    // TODO: do we need to delete wildcards as well?
                     log.info("We are not deleting ACLs with wildcards");
                     return;
                 }
                 if (topicMap.get(aclBinding.pattern().name()) == null) {
-                    log.info("Aclbinding must be deleted");
-                    deleteAclBinding(aclBinding);
+                    log.info("Aclbinding for topic {} must be deleted {}", aclBinding.pattern().name(), aclBinding);
+                    if (!dryrun) {
+                        deleteAclBinding(aclBinding);
+                    } else {
+                        log.info("Not really deleting, since this is a dryrun.");
+                    }
                 }
             }
         });

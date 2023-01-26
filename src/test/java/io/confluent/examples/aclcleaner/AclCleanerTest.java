@@ -1,3 +1,5 @@
+package io.confluent.examples.aclcleaner;
+
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.common.acl.AccessControlEntry;
 import org.apache.kafka.common.acl.AclBinding;
@@ -9,6 +11,7 @@ import org.apache.kafka.common.resource.ResourceType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
@@ -34,9 +37,9 @@ public class AclCleanerTest {
     }
 
     @Test
-    public void testAclCleaning() {
-        AclCleanerService aclCleanerService = new AclCleanerService();
-        aclCleanerService.clean();
+    public void testAclCleaning() throws IOException {
+        AclCleanerService aclCleanerService = new AclCleanerService("/tmp/aclcleaner.properties");
+        aclCleanerService.clean(true);
         // TODO: assert that the ACL was deleted
     }
 
